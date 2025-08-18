@@ -7,7 +7,9 @@ import { Upload, Database, AlertTriangle, TrendingUp, Activity } from "lucide-re
 import { AWRUpload } from "@/components/AWRUpload";
 import { PerformanceDashboard } from "@/components/PerformanceDashboard";
 import { SQLAnalysis } from "@/components/SQLAnalysis";
+import { AWRRecommendations } from "@/components/AWRRecommendations";
 import { useToast } from "@/hooks/use-toast";
+import { AWRParser } from "@/services/awrParser";
 import awrLogo from "@/assets/awr-logo.png";
 
 interface AWRData {
@@ -39,64 +41,25 @@ const Index = () => {
     setIsAnalyzing(true);
     
     try {
-      // Simular processamento do AWR
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Analisar arquivo AWR real
+      const parsedData = await AWRParser.parseFile(file);
       
-      // Mock data baseado no exemplo fornecido
-      const mockData: AWRData = {
-        topSQL: [
-          {
-            sql_id: "fh1c4w9qda6jr",
-            plan_hash: "3666371265",
-            executions: 4,
-            activity_pct: 3.10,
-            event: "CPU + Wait for CPU",
-            event_pct: 3.10,
-            row_source: "TABLE ACCESS - FULL",
-            row_source_pct: 2.33,
-            sql_text: "SELECT TC.s_Name AS ISSUERCOUN..."
-          },
-          {
-            sql_id: "gg1uzdcuth7yt", 
-            plan_hash: "3385703921",
-            executions: 4,
-            activity_pct: 3.10,
-            event: "PGA memory operation",
-            event_pct: 3.13,
-            row_source: "HASH JOIN",
-            row_source_pct: 1.55,
-            sql_text: "select a.id_msg_type as ID_MSG..."
-          },
-          {
-            sql_id: "3zf7vbnbdgyz",
-            plan_hash: "2709980812", 
-            executions: 3,
-            activity_pct: 2.33,
-            event: "CPU + Wait for CPU",
-            event_pct: 2.33,
-            row_source: "TABLE ACCESS - FULL",
-            row_source_pct: 1.55,
-            sql_text: "SELECT * from (SELECT A ACCOUN..."
-          }
-        ],
-        summary: {
-          total_sessions: 152,
-          cpu_time: 1250000,
-          db_time: 2100000,
-          wait_events: 48
-        }
-      };
-
-      setAWRData(mockData);
+      // Validar se dados foram extraídos
+      if (parsedData.topSQL.length === 0) {
+        throw new Error('Não foi possível extrair dados do arquivo AWR');
+      }
+      
+      setAWRData(parsedData);
       
       toast({
         title: "AWR Processado com Sucesso!",
-        description: "Análise de performance concluída. Verifique os resultados abaixo."
+        description: `Análise concluída com ${parsedData.topSQL.length} SQLs identificados.`
       });
     } catch (error) {
+      console.error('Erro ao processar AWR:', error);
       toast({
         title: "Erro no Processamento",
-        description: "Falha ao processar arquivo AWR. Tente novamente.",
+        description: error instanceof Error ? error.message : "Falha ao processar arquivo AWR. Verifique se o formato está correto.",
         variant: "destructive"
       });
     } finally {
@@ -209,45 +172,7 @@ const Index = () => {
               </TabsContent>
               
               <TabsContent value="recommendations" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Recomendações de Otimização</CardTitle>
-                    <CardDescription>Sugestões baseadas na análise do AWR</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <Badge variant="destructive">Crítico</Badge>
-                        <div>
-                          <p className="font-medium">Table Full Scan Detectado</p>
-                          <p className="text-sm text-muted-foreground">
-                            SQLs com TABLE ACCESS - FULL estão consumindo 2.33% do DB Time. Considere criar índices apropriados.
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-start gap-3">
-                        <Badge className="bg-warning text-warning-foreground">Alta</Badge>
-                        <div>
-                          <p className="font-medium">CPU + Wait for CPU</p>
-                          <p className="text-sm text-muted-foreground">
-                            Alto uso de CPU detectado. Verifique se há consultas que podem ser otimizadas ou se é necessário mais recursos de CPU.
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-start gap-3">
-                        <Badge className="bg-performance-medium text-black">Média</Badge>
-                        <div>
-                          <p className="font-medium">PGA Memory Operation</p>
-                          <p className="text-sm text-muted-foreground">
-                            Operações de memória PGA podem ser otimizadas ajustando parâmetros de memória.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <AWRRecommendations data={awrData} />
               </TabsContent>
             </Tabs>
 
