@@ -52,6 +52,24 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				oracle: {
+					red: 'hsl(var(--oracle-red))',
+					blue: 'hsl(var(--oracle-blue))',
+				},
+				warning: {
+					DEFAULT: 'hsl(var(--warning))',
+					foreground: 'hsl(var(--warning-foreground))'
+				},
+				success: {
+					DEFAULT: 'hsl(var(--success))',
+					foreground: 'hsl(var(--success-foreground))'
+				},
+				performance: {
+					critical: 'hsl(var(--critical))',
+					high: 'hsl(var(--high))',
+					medium: 'hsl(var(--medium))',
+					low: 'hsl(var(--low))'
+				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
