@@ -50,6 +50,16 @@ All colors MUST be HSL.
     --medium: 48 96% 53%;
     --low: 142 71% 45%;
     
+    /* Chart colors for beautiful visualizations */
+    --chart-1: 217 91% 60%;  /* Primary blue */
+    --chart-2: 0 84% 60%;    /* Oracle red */
+    --chart-3: 142 71% 45%;  /* Success green */
+    --chart-4: 38 92% 50%;   /* Warning yellow */
+    --chart-5: 270 95% 75%;  /* Purple */
+    --chart-6: 35 91% 65%;   /* Orange */
+    --chart-7: 195 100% 50%; /* Cyan */
+    --chart-8: 330 81% 60%;  /* Pink */
+    
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--oracle-blue)));
     --gradient-danger: linear-gradient(135deg, hsl(var(--destructive)), hsl(var(--oracle-red)));
