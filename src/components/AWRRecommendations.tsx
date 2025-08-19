@@ -38,10 +38,18 @@ export const AWRRecommendations = ({ data }: AWRRecommendationsProps) => {
   const generateRecommendations = (): Recommendation[] => {
     const recommendations: Recommendation[] = [];
     
-    // Analisar Table Full Scans
+    // Verificar se há dados válidos para análise
+    if (!data.topSQL || data.topSQL.length === 0) {
+      return recommendations;
+    }
+    
+    // Analisar Table Full Scans - só adiciona se há SQLs com problema
     const fullScanSQLs = data.topSQL.filter(sql => 
+      sql.sql_id && 
+      sql.row_source && 
       sql.row_source.toLowerCase().includes('table access') && 
-      sql.row_source.toLowerCase().includes('full')
+      sql.row_source.toLowerCase().includes('full') &&
+      sql.activity_pct > 1 // Só considera se tem impacto significativo
     );
     
     if (fullScanSQLs.length > 0) {
@@ -51,13 +59,16 @@ export const AWRRecommendations = ({ data }: AWRRecommendationsProps) => {
         title: 'Table Full Scan Detectado',
         description: `${fullScanSQLs.length} SQLs com TABLE ACCESS - FULL consumindo ${totalFullScanActivity.toFixed(2)}% do DB Time. Considere criar índices apropriados.`,
         icon: Database,
-        sqlIds: fullScanSQLs.map(sql => sql.sql_id)
+        sqlIds: fullScanSQLs.map(sql => sql.sql_id).filter(id => id)
       });
     }
 
-    // Analisar CPU Usage
+    // Analisar CPU Usage - só adiciona se há SQLs com problema
     const cpuSQLs = data.topSQL.filter(sql => 
-      sql.event.toLowerCase().includes('cpu')
+      sql.sql_id &&
+      sql.event && 
+      sql.event.toLowerCase().includes('cpu') &&
+      sql.activity_pct > 2 // Só considera se tem impacto significativo
     );
     
     if (cpuSQLs.length > 0) {
@@ -67,14 +78,17 @@ export const AWRRecommendations = ({ data }: AWRRecommendationsProps) => {
         title: 'Alto Uso de CPU',
         description: `${cpuSQLs.length} SQLs consumindo CPU (${totalCPUActivity.toFixed(2)}% do DB Time). Verifique se há consultas que podem ser otimizadas.`,
         icon: TrendingUp,
-        sqlIds: cpuSQLs.map(sql => sql.sql_id)
+        sqlIds: cpuSQLs.map(sql => sql.sql_id).filter(id => id)
       });
     }
 
-    // Analisar PGA Memory Operations
+    // Analisar PGA Memory Operations - só adiciona se há SQLs com problema
     const pgaSQLs = data.topSQL.filter(sql => 
-      sql.event.toLowerCase().includes('pga') || 
-      sql.event.toLowerCase().includes('memory')
+      sql.sql_id &&
+      sql.event &&
+      (sql.event.toLowerCase().includes('pga') || 
+       sql.event.toLowerCase().includes('memory')) &&
+      sql.activity_pct > 1
     );
     
     if (pgaSQLs.length > 0) {
@@ -83,13 +97,16 @@ export const AWRRecommendations = ({ data }: AWRRecommendationsProps) => {
         title: 'Operações de Memória PGA',
         description: `${pgaSQLs.length} SQLs com operações de memória PGA detectadas. Considere ajustar parâmetros de memória ou otimizar consultas.`,
         icon: AlertTriangle,
-        sqlIds: pgaSQLs.map(sql => sql.sql_id)
+        sqlIds: pgaSQLs.map(sql => sql.sql_id).filter(id => id)
       });
     }
 
-    // Analisar Hash Joins
+    // Analisar Hash Joins - só adiciona se há SQLs com problema
     const hashJoinSQLs = data.topSQL.filter(sql => 
-      sql.row_source.toLowerCase().includes('hash join')
+      sql.sql_id &&
+      sql.row_source &&
+      sql.row_source.toLowerCase().includes('hash join') &&
+      sql.activity_pct > 1
     );
     
     if (hashJoinSQLs.length > 0) {
@@ -98,12 +115,16 @@ export const AWRRecommendations = ({ data }: AWRRecommendationsProps) => {
         title: 'Hash Joins Frequentes',
         description: `${hashJoinSQLs.length} SQLs usando HASH JOIN. Verifique se índices podem melhorar o desempenho destes joins.`,
         icon: Database,
-        sqlIds: hashJoinSQLs.map(sql => sql.sql_id)
+        sqlIds: hashJoinSQLs.map(sql => sql.sql_id).filter(id => id)
       });
     }
 
-    // Analisar execuções altas
-    const highExecSQLs = data.topSQL.filter(sql => sql.executions > 1000);
+    // Analisar execuções altas - só adiciona se há SQLs com problema
+    const highExecSQLs = data.topSQL.filter(sql => 
+      sql.sql_id && 
+      sql.executions > 1000 &&
+      sql.activity_pct > 1 // Só considera se tem impacto significativo
+    );
     
     if (highExecSQLs.length > 0) {
       recommendations.push({
@@ -111,29 +132,25 @@ export const AWRRecommendations = ({ data }: AWRRecommendationsProps) => {
         title: 'SQLs com Muitas Execuções',
         description: `${highExecSQLs.length} SQLs executados muito frequentemente. Considere cache de resultados ou otimização das consultas.`,
         icon: Clock,
-        sqlIds: highExecSQLs.map(sql => sql.sql_id)
+        sqlIds: highExecSQLs.map(sql => sql.sql_id).filter(id => id)
       });
     }
 
-    // Analisar DB Time vs CPU Time ratio
-    const dbTimeCpuRatio = data.summary.cpu_time / data.summary.db_time;
+    // Analisar Wait Events específicos - só adiciona se há SQLs com problema
+    const waitEventSQLs = data.topSQL.filter(sql => 
+      sql.sql_id &&
+      sql.event &&
+      sql.event.toLowerCase().includes('wait') &&
+      sql.activity_pct > 2
+    );
     
-    if (dbTimeCpuRatio < 0.3) {
+    if (waitEventSQLs.length > 0) {
       recommendations.push({
         priority: 'high',
-        title: 'Alto Tempo de Espera',
-        description: `Apenas ${(dbTimeCpuRatio * 100).toFixed(1)}% do DB Time é CPU. Investigue eventos de espera e gargalos de I/O.`,
-        icon: Clock
-      });
-    }
-
-    // Se muitas sessões ativas
-    if (data.summary.total_sessions > 200) {
-      recommendations.push({
-        priority: 'medium',
-        title: 'Muitas Sessões Ativas',
-        description: `${data.summary.total_sessions} sessões ativas. Verifique se há conexões ociosas ou considere connection pooling.`,
-        icon: Database
+        title: 'Eventos de Espera Detectados',
+        description: `${waitEventSQLs.length} SQLs com eventos de espera significativos. Investigue gargalos de I/O ou contenção de recursos.`,
+        icon: Clock,
+        sqlIds: waitEventSQLs.map(sql => sql.sql_id).filter(id => id)
       });
     }
 
