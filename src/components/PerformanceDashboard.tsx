@@ -1,7 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { AlertTriangle, Database, Clock, TrendingDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, Database, Clock, TrendingDown, ExternalLink } from "lucide-react";
 
 interface AWRData {
   topSQL: Array<{
@@ -25,9 +26,10 @@ interface AWRData {
 
 interface PerformanceDashboardProps {
   data: AWRData;
+  onSQLClick: (sqlId: string) => void;
 }
 
-export const PerformanceDashboard = ({ data }: PerformanceDashboardProps) => {
+export const PerformanceDashboard = ({ data, onSQLClick }: PerformanceDashboardProps) => {
   // Preparar dados para análise de eventos
   const eventSummary = data.topSQL.reduce((acc, sql) => {
     const existing = acc.find(item => item.event === sql.event);
@@ -117,7 +119,18 @@ export const PerformanceDashboard = ({ data }: PerformanceDashboardProps) => {
                           {index + 1}
                         </div>
                         <div>
-                          <p className="font-mono text-sm font-medium">{sql.sql_id}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-mono text-sm font-medium">{sql.sql_id}</p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onSQLClick(sql.sql_id)}
+                              className="h-6 w-6 p-0 hover:bg-primary/10"
+                              title="Ver detalhes na Análise SQL"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </Button>
+                          </div>
                           <p className="text-xs text-muted-foreground">Plan Hash: {sql.plan_hash}</p>
                         </div>
                       </div>

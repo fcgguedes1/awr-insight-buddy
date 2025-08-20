@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,11 +21,25 @@ interface SQLData {
 
 interface SQLAnalysisProps {
   sqlData: SQLData[];
+  selectedSQLId?: string | null;
+  onSQLSelect?: (sqlId: string | null) => void;
 }
 
-export const SQLAnalysis = ({ sqlData }: SQLAnalysisProps) => {
+export const SQLAnalysis = ({ sqlData, selectedSQLId, onSQLSelect }: SQLAnalysisProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSQL, setSelectedSQL] = useState<SQLData | null>(null);
+
+  // Auto-select SQL when selectedSQLId prop changes
+  useEffect(() => {
+    if (selectedSQLId) {
+      const sql = sqlData.find(s => s.sql_id === selectedSQLId);
+      if (sql) {
+        setSelectedSQL(sql);
+        // Clear the external selection after setting it
+        onSQLSelect?.(null);
+      }
+    }
+  }, [selectedSQLId, sqlData, onSQLSelect]);
 
   const filteredData = sqlData.filter(sql =>
     sql.sql_id.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -35,6 +35,8 @@ interface AWRData {
 const Index = () => {
   const [awrData, setAWRData] = useState<AWRData | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [selectedSQLId, setSelectedSQLId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("dashboard");
   const { toast } = useToast();
 
   const handleFileUpload = async (file: File) => {
@@ -67,6 +69,11 @@ const Index = () => {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleSQLClick = (sqlId: string) => {
+    setSelectedSQLId(sqlId);
+    setActiveTab("sql-analysis");
   };
 
   return (
@@ -158,7 +165,7 @@ const Index = () => {
             </div>
 
             {/* Analysis Tabs */}
-            <Tabs defaultValue="dashboard" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                 <TabsTrigger value="sql-analysis">Análise SQL</TabsTrigger>
@@ -166,11 +173,15 @@ const Index = () => {
               </TabsList>
               
               <TabsContent value="dashboard" className="space-y-4">
-                <PerformanceDashboard data={awrData} />
+                <PerformanceDashboard data={awrData} onSQLClick={handleSQLClick} />
               </TabsContent>
               
               <TabsContent value="sql-analysis" className="space-y-4">
-                <SQLAnalysis sqlData={awrData.topSQL} />
+                <SQLAnalysis 
+                  sqlData={awrData.topSQL} 
+                  selectedSQLId={selectedSQLId}
+                  onSQLSelect={setSelectedSQLId}
+                />
               </TabsContent>
               
               <TabsContent value="recommendations" className="space-y-4">
