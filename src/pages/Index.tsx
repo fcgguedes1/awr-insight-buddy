@@ -39,6 +39,8 @@ const Index = () => {
 
   const handleFileUpload = async (file: File) => {
     setIsAnalyzing(true);
+    // Limpar dados anteriores para garantir fresh start
+    setAWRData(null);
     
     try {
       // Analisar arquivo AWR real

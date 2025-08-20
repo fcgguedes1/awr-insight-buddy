@@ -2,7 +2,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, Database, Clock, TrendingDown } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, ScatterChart, Scatter } from "recharts";
 
 interface AWRData {
   topSQL: Array<{
@@ -29,67 +28,24 @@ interface PerformanceDashboardProps {
 }
 
 export const PerformanceDashboard = ({ data }: PerformanceDashboardProps) => {
-  // Preparar dados para gráfico de barras
-  const topSQLChart = data.topSQL
-    .sort((a, b) => b.activity_pct - a.activity_pct)
-    .slice(0, 10)
-    .map(sql => ({
-      sql_id: sql.sql_id.substring(0, 8) + "...",
-      activity_pct: sql.activity_pct,
-      event_pct: sql.event_pct,
-      executions: sql.executions
-    }));
-
-  // Preparar dados para distribuição de eventos
-  const eventData = data.topSQL.reduce((acc, sql) => {
+  // Preparar dados para análise de eventos
+  const eventSummary = data.topSQL.reduce((acc, sql) => {
     const existing = acc.find(item => item.event === sql.event);
     if (existing) {
-      existing.value += sql.event_pct;
+      existing.total_pct += sql.event_pct;
       existing.count += 1;
+      existing.avg_pct = existing.total_pct / existing.count;
     } else {
       acc.push({
         event: sql.event,
-        value: sql.event_pct,
-        count: 1
+        total_pct: sql.event_pct,
+        count: 1,
+        avg_pct: sql.event_pct
       });
     }
     return acc;
-  }, [] as Array<{ event: string; value: number; count: number }>)
-  .sort((a, b) => b.value - a.value);
-
-  // Preparar dados para gráfico de correlação atividade x execuções
-  const correlationData = data.topSQL
-    .filter(sql => sql.executions > 0 && sql.activity_pct > 0)
-    .map(sql => ({
-      sql_id: sql.sql_id.substring(0, 6),
-      executions: sql.executions,
-      activity_pct: sql.activity_pct,
-      efficiency: sql.activity_pct / Math.max(sql.executions, 1) * 1000 // Atividade por mil execuções
-    }));
-
-  // Preparar dados para tendência de performance por SQL
-  const performanceTrendData = data.topSQL
-    .sort((a, b) => b.activity_pct - a.activity_pct)
-    .slice(0, 5)
-    .map((sql, index) => ({
-      rank: index + 1,
-      sql_id: sql.sql_id.substring(0, 8),
-      activity_pct: sql.activity_pct,
-      event_pct: sql.event_pct,
-      executions_k: Math.round(sql.executions / 1000)
-    }));
-
-  // Paleta de cores usando tokens do design system
-  const COLORS = [
-    'hsl(var(--chart-1))', 
-    'hsl(var(--chart-2))', 
-    'hsl(var(--chart-3))', 
-    'hsl(var(--chart-4))',
-    'hsl(var(--chart-5))',
-    'hsl(var(--chart-6))',
-    'hsl(var(--chart-7))',
-    'hsl(var(--chart-8))'
-  ];
+  }, [] as Array<{ event: string; total_pct: number; count: number; avg_pct: number }>)
+  .sort((a, b) => b.total_pct - a.total_pct);
 
   const getPerformanceLevel = (percentage: number) => {
     if (percentage > 3) return { level: "Crítico", color: "destructive" };
@@ -100,186 +56,39 @@ export const PerformanceDashboard = ({ data }: PerformanceDashboardProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Performance Overview - Grid com 4 gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5" />
-              Top SQL por Atividade
-            </CardTitle>
-            <CardDescription>Top 10 SQLs que mais consomem recursos</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={topSQLChart} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.3} />
-                <XAxis 
-                  dataKey="sql_id" 
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={11}
-                  angle={-45}
-                  textAnchor="end"
-                  height={60}
-                />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <Tooltip 
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "var(--radius)",
-                    color: "hsl(var(--foreground))"
-                  }}
-                  formatter={(value, name) => [
-                    `${value}%`, 
-                    name === 'activity_pct' ? 'DB Activity' : 'Event %'
-                  ]}
-                />
-                <Bar dataKey="activity_pct" fill="hsl(var(--primary))" name="DB Activity" />
-                <Bar dataKey="event_pct" fill="hsl(var(--oracle-red))" name="Event %" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Distribuição de Eventos
-            </CardTitle>
-            <CardDescription>Tipos de eventos que estão causando esperas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={eventData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  outerRadius={90}
-                  fill="#8884d8"
-                  dataKey="value"
-                  label={({event, value}) => value > 2 ? `${event.substring(0, 15)}: ${value.toFixed(1)}%` : ''}
-                >
-                  {eventData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value) => [`${typeof value === 'number' ? value.toFixed(2) : value}%`, 'Tempo de Espera']}
-                  labelFormatter={(label) => `Evento: ${label}`}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5" />
-              Correlação: Atividade x Execuções
-            </CardTitle>
-            <CardDescription>Relação entre execuções e impacto na performance</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <ScatterChart data={correlationData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.3} />
-                <XAxis 
-                  type="number" 
-                  dataKey="executions" 
-                  name="Execuções"
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
-                />
-                <YAxis 
-                  type="number" 
-                  dataKey="activity_pct" 
-                  name="DB Activity %"
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
-                />
-                <Tooltip 
-                  cursor={{ strokeDasharray: '3 3' }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload;
-                      return (
-                        <div className="bg-card p-3 border rounded-lg shadow-lg">
-                          <p className="font-medium">SQL: {data.sql_id}</p>
-                          <p className="text-sm">Execuções: {data.executions.toLocaleString()}</p>
-                          <p className="text-sm">DB Activity: {data.activity_pct}%</p>
-                          <p className="text-sm">Eficiência: {data.efficiency.toFixed(2)}</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Scatter dataKey="activity_pct" fill="hsl(var(--primary))" />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5" />
-              Performance Ranking
-            </CardTitle>
-            <CardDescription>Top 5 SQLs ordenados por impacto</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={performanceTrendData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.3} />
-                <XAxis 
-                  dataKey="rank" 
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
-                />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <Tooltip 
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "var(--radius)",
-                    color: "hsl(var(--foreground))"
-                  }}
-                  labelFormatter={(value) => `Ranking: #${value}`}
-                  formatter={(value, name, props) => [
-                    `${value}${typeof name === 'string' && name.includes('executions') ? 'k' : '%'}`, 
-                    name === 'activity_pct' ? 'DB Activity' : 
-                    name === 'event_pct' ? 'Event %' : 'Execuções (k)'
-                  ]}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="activity_pct" 
-                  stackId="1"
-                  stroke="hsl(var(--primary))" 
-                  fill="hsl(var(--primary))" 
-                  fillOpacity={0.6}
-                  name="activity_pct"
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="event_pct" 
-                  stackId="1"
-                  stroke="hsl(var(--oracle-red))" 
-                  fill="hsl(var(--oracle-red))" 
-                  fillOpacity={0.6}
-                  name="event_pct"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Eventos Mais Impactantes */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Eventos Mais Impactantes
+          </CardTitle>
+          <CardDescription>
+            Eventos que mais impactam a performance do banco de dados
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {eventSummary.slice(0, 8).map((event, index) => (
+              <div key={event.event} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
+                    {index + 1}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{event.event}</p>
+                    <p className="text-xs text-muted-foreground">{event.count} SQL{event.count !== 1 ? 's' : ''} afetado{event.count !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-sm">{event.total_pct.toFixed(1)}%</p>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Top Offenders */}
       <Card>

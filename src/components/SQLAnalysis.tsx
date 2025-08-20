@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Database, Clock, AlertCircle, TrendingUp } from "lucide-react";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, LineChart, Line } from "recharts";
+import { Search, Database, Clock, AlertCircle } from "lucide-react";
 
 interface SQLData {
   sql_id: string;
@@ -111,50 +110,6 @@ export const SQLAnalysis = ({ sqlData }: SQLAnalysisProps) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {filteredData.length > 0 && (
-            <div className="mb-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Visão Geral dos SQLs Filtrados</CardTitle>
-                  <CardDescription>Distribuição de performance dos SQLs</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={filteredData.slice(0, 10).map(sql => ({
-                      sql_id: sql.sql_id.substring(0, 6) + "...",
-                      activity_pct: sql.activity_pct,
-                      executions_k: Math.round(sql.executions / 1000)
-                    }))}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.2} />
-                      <XAxis 
-                        dataKey="sql_id" 
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={10}
-                        angle={-45}
-                        textAnchor="end"
-                        height={50}
-                      />
-                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "var(--radius)",
-                          color: "hsl(var(--foreground))"
-                        }}
-                        formatter={(value, name) => [
-                          `${value}${name === 'executions_k' ? 'k' : '%'}`, 
-                          name === 'activity_pct' ? 'DB Activity' : 'Execuções (k)'
-                        ]}
-                      />
-                      <Bar dataKey="activity_pct" fill="hsl(var(--primary))" name="activity_pct" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-          
           <Table>
             <TableHeader>
               <TableRow>
@@ -237,12 +192,11 @@ export const SQLAnalysis = ({ sqlData }: SQLAnalysisProps) => {
             <Tabs defaultValue="overview">
               <TabsList>
                 <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-                <TabsTrigger value="performance">Performance</TabsTrigger>
                 <TabsTrigger value="recommendations">Recomendações</TabsTrigger>
               </TabsList>
               
               <TabsContent value="overview" className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <h4 className="font-semibold mb-2">Informações Básicas</h4>
                     <div className="space-y-2 text-sm">
@@ -261,22 +215,12 @@ export const SQLAnalysis = ({ sqlData }: SQLAnalysisProps) => {
                     </div>
                   </div>
                 </div>
-                
-                <div>
-                  <h4 className="font-semibold mb-2">Texto do SQL</h4>
-                  <div className="bg-muted p-4 rounded-md font-mono text-sm">
-                    {selectedSQL.sql_text}
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="performance" className="space-y-4">
-                {/* Métricas Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4" />
+                        <AlertCircle className="h-4 w-4" />
                         Impacto no Sistema
                       </CardTitle>
                     </CardHeader>
@@ -324,112 +268,12 @@ export const SQLAnalysis = ({ sqlData }: SQLAnalysisProps) => {
                     </CardContent>
                   </Card>
                 </div>
-
-                {/* Gráficos de Performance */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Análise Radar - Métricas do SQL</CardTitle>
-                      <CardDescription>Visualização multidimensional das métricas</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <RadarChart data={[
-                          {
-                            metric: 'DB Activity',
-                            value: selectedSQL.activity_pct,
-                            fullMark: Math.max(5, selectedSQL.activity_pct * 1.2)
-                          },
-                          {
-                            metric: 'Event %',
-                            value: selectedSQL.event_pct,
-                            fullMark: Math.max(5, selectedSQL.event_pct * 1.2)
-                          },
-                          {
-                            metric: 'Row Source %',
-                            value: selectedSQL.row_source_pct,
-                            fullMark: Math.max(5, selectedSQL.row_source_pct * 1.2)
-                          },
-                          {
-                            metric: 'Exec Intensity',
-                            value: Math.min(10, selectedSQL.executions / 100),
-                            fullMark: 10
-                          }
-                        ]}>
-                          <PolarGrid stroke="hsl(var(--muted-foreground))" opacity={0.3} />
-                          <PolarAngleAxis 
-                            dataKey="metric" 
-                            tick={{ fill: 'hsl(var(--foreground))', fontSize: 12 }}
-                          />
-                          <PolarRadiusAxis 
-                            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                            tickCount={4}
-                          />
-                          <Radar
-                            name="Métricas"
-                            dataKey="value"
-                            stroke="hsl(var(--primary))"
-                            fill="hsl(var(--primary))"
-                            fillOpacity={0.3}
-                            strokeWidth={2}
-                          />
-                        </RadarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Comparação com Top SQLs</CardTitle>
-                      <CardDescription>Como este SQL se compara aos mais críticos</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={
-                          sqlData
-                            .sort((a, b) => b.activity_pct - a.activity_pct)
-                            .slice(0, 5)
-                            .map(sql => ({
-                              sql_id: sql.sql_id.substring(0, 8),
-                              activity_pct: sql.activity_pct,
-                              isSelected: sql.sql_id === selectedSQL.sql_id,
-                              selectedValue: sql.sql_id === selectedSQL.sql_id ? sql.activity_pct : 0,
-                              otherValue: sql.sql_id !== selectedSQL.sql_id ? sql.activity_pct : 0
-                            }))
-                        }>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.3} />
-                          <XAxis 
-                            dataKey="sql_id" 
-                            stroke="hsl(var(--muted-foreground))"
-                            fontSize={11}
-                            angle={-45}
-                            textAnchor="end"
-                            height={60}
-                          />
-                          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                          <Tooltip 
-                            contentStyle={{
-                              backgroundColor: "hsl(var(--card))",
-                              border: "1px solid hsl(var(--border))",
-                              borderRadius: "var(--radius)",
-                              color: "hsl(var(--foreground))"
-                            }}
-                            formatter={(value) => [`${value}%`, 'DB Activity']}
-                          />
-                          <Bar 
-                            dataKey="selectedValue" 
-                            fill="hsl(var(--primary))"
-                            name="SQL Selecionado"
-                          />
-                          <Bar 
-                            dataKey="otherValue" 
-                            fill="hsl(var(--muted-foreground))"
-                            name="Outros SQLs"
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
+                
+                <div>
+                  <h4 className="font-semibold mb-2">Texto do SQL</h4>
+                  <div className="bg-muted p-4 rounded-md font-mono text-sm">
+                    {selectedSQL.sql_text}
+                  </div>
                 </div>
               </TabsContent>
               
