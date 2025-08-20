@@ -136,7 +136,7 @@ const Index = () => {
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{(awrData.summary.db_time / 1000000).toFixed(2)}s</div>
+                  <div className="text-2xl font-bold">{awrData.summary.db_time.toFixed(2)}s</div>
                   <p className="text-xs text-muted-foreground">Tempo total do banco</p>
                 </CardContent>
               </Card>
@@ -147,7 +147,7 @@ const Index = () => {
                   <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{(awrData.summary.cpu_time / 1000000).toFixed(2)}s</div>
+                  <div className="text-2xl font-bold">{awrData.summary.cpu_time.toFixed(2)}s</div>
                   <p className="text-xs text-muted-foreground">Tempo de CPU</p>
                 </CardContent>
               </Card>

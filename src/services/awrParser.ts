@@ -256,41 +256,118 @@ export class AWRParser {
       wait_events: 0
     };
 
-    // Procurar por informações de resumo
-    const text = doc.body.textContent || '';
+    // Procurar na seção "Time Model Statistics" primeiro
+    const tables = doc.querySelectorAll('table');
     
-    // Extrair DB Time
-    const dbTimeMatch = text.match(/DB Time[:\s]+([0-9,.]+)/i);
-    if (dbTimeMatch) {
-      summary.db_time = parseFloat(dbTimeMatch[1].replace(/,/g, '')) * 1000000; // Converter para microsegundos
+    for (const table of tables) {
+      const tableText = table.textContent || '';
+      
+      // Verificar se é a tabela de Time Model Statistics
+      if (tableText.includes('Time Model Statistics') || 
+          tableText.includes('DB time') || 
+          tableText.includes('DB Time')) {
+        
+        const rows = table.querySelectorAll('tr');
+        
+        for (const row of rows) {
+          const cells = Array.from(row.querySelectorAll('td, th')).map(cell => cell.textContent?.trim() || '');
+          
+          // Procurar por DB Time
+          if (cells.some(cell => cell.toLowerCase().includes('db time'))) {
+            // Procurar por valores numéricos nas células
+            for (const cell of cells) {
+              const timeMatch = cell.match(/([0-9,]+\.?[0-9]*)\s*s/i) || cell.match(/([0-9,]+\.?[0-9]*)/);
+              if (timeMatch && parseFloat(timeMatch[1].replace(/,/g, '')) > 0) {
+                summary.db_time = parseFloat(timeMatch[1].replace(/,/g, ''));
+                break;
+              }
+            }
+          }
+          
+          // Procurar por CPU Time
+          if (cells.some(cell => cell.toLowerCase().includes('cpu time') || cell.toLowerCase().includes('cpu used'))) {
+            for (const cell of cells) {
+              const timeMatch = cell.match(/([0-9,]+\.?[0-9]*)\s*s/i) || cell.match(/([0-9,]+\.?[0-9]*)/);
+              if (timeMatch && parseFloat(timeMatch[1].replace(/,/g, '')) > 0) {
+                summary.cpu_time = parseFloat(timeMatch[1].replace(/,/g, ''));
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      // Procurar por informações de Sessions em outras tabelas
+      if (tableText.includes('Instance Efficiency') || 
+          tableText.includes('Load Profile')) {
+        
+        const rows = table.querySelectorAll('tr');
+        
+        for (const row of rows) {
+          const cells = Array.from(row.querySelectorAll('td, th')).map(cell => cell.textContent?.trim() || '');
+          
+          if (cells.some(cell => cell.toLowerCase().includes('sessions') || cell.toLowerCase().includes('user calls'))) {
+            for (const cell of cells) {
+              const sessionMatch = cell.match(/([0-9,]+)/);
+              if (sessionMatch && parseInt(sessionMatch[1].replace(/,/g, '')) > 0) {
+                summary.total_sessions = parseInt(sessionMatch[1].replace(/,/g, ''));
+                break;
+              }
+            }
+          }
+        }
+      }
     }
 
-    // Extrair CPU Time  
-    const cpuTimeMatch = text.match(/CPU[:\s]+([0-9,.]+)/i);
-    if (cpuTimeMatch) {
-      summary.cpu_time = parseFloat(cpuTimeMatch[1].replace(/,/g, '')) * 1000000;
-    }
-
-    // Extrair Sessions
-    const sessionsMatch = text.match(/Sessions[:\s]+([0-9,]+)/i);
-    if (sessionsMatch) {
-      summary.total_sessions = parseInt(sessionsMatch[1].replace(/,/g, ''));
+    // Fallback: procurar no texto geral se não encontrou nas tabelas
+    if (summary.db_time === 0 || summary.cpu_time === 0) {
+      const text = doc.body.textContent || '';
+      
+      // Padrões mais específicos para DB Time
+      const dbTimePatterns = [
+        /DB Time[:\s]+([0-9,.]+)\s*s/i,
+        /DB time[:\s]+([0-9,.]+)\s*s/i,
+        /Database Time[:\s]+([0-9,.]+)\s*s/i,
+        /Total Database Time[:\s]+([0-9,.]+)\s*s/i
+      ];
+      
+      for (const pattern of dbTimePatterns) {
+        const match = text.match(pattern);
+        if (match && summary.db_time === 0) {
+          summary.db_time = parseFloat(match[1].replace(/,/g, ''));
+          break;
+        }
+      }
+      
+      // Padrões para CPU Time
+      const cpuTimePatterns = [
+        /CPU Time[:\s]+([0-9,.]+)\s*s/i,
+        /CPU time[:\s]+([0-9,.]+)\s*s/i,
+        /CPU used by this session[:\s]+([0-9,.]+)\s*s/i
+      ];
+      
+      for (const pattern of cpuTimePatterns) {
+        const match = text.match(pattern);
+        if (match && summary.cpu_time === 0) {
+          summary.cpu_time = parseFloat(match[1].replace(/,/g, ''));
+          break;
+        }
+      }
     }
 
     // Contar eventos de espera únicos
-    const tables = doc.querySelectorAll('table');
     let waitEventCount = 0;
     
     for (const table of tables) {
       const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent?.trim().toLowerCase() || '');
       
-      if (headers.some(h => h.includes('wait') && h.includes('event'))) {
+      if (headers.some(h => (h.includes('wait') && h.includes('event')) || h.includes('top 5 timed events'))) {
         const rows = table.querySelectorAll('tbody tr');
         waitEventCount = Math.max(waitEventCount, rows.length);
       }
     }
     
-    summary.wait_events = waitEventCount || 25; // Default se não encontrar
+    summary.wait_events = waitEventCount || 0;
 
     return summary;
   }
@@ -350,28 +427,53 @@ export class AWRParser {
 
     const text = lines.join(' ');
     
-    // Extrair métricas do texto
-    const dbTimeMatch = text.match(/DB Time[:\s]+([0-9,.]+)/i);
-    if (dbTimeMatch) {
-      summary.db_time = parseFloat(dbTimeMatch[1].replace(/,/g, '')) * 1000000;
-    }
-
-    const cpuTimeMatch = text.match(/CPU[:\s]+([0-9,.]+)/i);
-    if (cpuTimeMatch) {
-      summary.cpu_time = parseFloat(cpuTimeMatch[1].replace(/,/g, '')) * 1000000;
-    }
-
-    const sessionsMatch = text.match(/Sessions[:\s]+([0-9,]+)/i);
-    if (sessionsMatch) {
-      summary.total_sessions = parseInt(sessionsMatch[1].replace(/,/g, ''));
-    }
-
-    // Valores padrão se não encontrar
-    if (summary.db_time === 0) summary.db_time = Math.random() * 5000000 + 1000000;
-    if (summary.cpu_time === 0) summary.cpu_time = summary.db_time * 0.6;
-    if (summary.total_sessions === 0) summary.total_sessions = Math.floor(Math.random() * 200) + 50;
+    // Padrões mais específicos para extrair métricas do texto
+    const dbTimePatterns = [
+      /DB Time[:\s]+([0-9,.]+)\s*s/i,
+      /DB time[:\s]+([0-9,.]+)\s*s/i,
+      /Database Time[:\s]+([0-9,.]+)\s*s/i,
+      /Total Database Time[:\s]+([0-9,.]+)\s*s/i
+    ];
     
-    summary.wait_events = Math.floor(Math.random() * 50) + 20;
+    for (const pattern of dbTimePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        summary.db_time = parseFloat(match[1].replace(/,/g, ''));
+        break;
+      }
+    }
+
+    const cpuTimePatterns = [
+      /CPU Time[:\s]+([0-9,.]+)\s*s/i,
+      /CPU time[:\s]+([0-9,.]+)\s*s/i,
+      /CPU used by this session[:\s]+([0-9,.]+)\s*s/i
+    ];
+    
+    for (const pattern of cpuTimePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        summary.cpu_time = parseFloat(match[1].replace(/,/g, ''));
+        break;
+      }
+    }
+
+    const sessionsPatterns = [
+      /Sessions[:\s]+([0-9,]+)/i,
+      /User calls[:\s]+([0-9,]+)/i,
+      /Logical reads[:\s]+([0-9,]+)/i
+    ];
+    
+    for (const pattern of sessionsPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        summary.total_sessions = parseInt(match[1].replace(/,/g, ''));
+        break;
+      }
+    }
+
+    // Procurar por contagem de wait events no texto
+    const waitEventMatches = text.match(/wait event/gi);
+    summary.wait_events = waitEventMatches ? Math.min(waitEventMatches.length, 50) : 0;
 
     return summary;
   }
